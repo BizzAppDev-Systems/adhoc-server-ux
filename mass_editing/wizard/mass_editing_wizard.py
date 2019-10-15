@@ -51,18 +51,9 @@ class MassEditingWizard(models.TransientModel):
                                       ('remove_m2m', 'Remove'),
                                       ('add', 'Add')]
                     }
-                    xml_group = etree.SubElement(xml_group, 'group', {
-                        'colspan': '6',
-                        'col': '6',
-                    })
-                    etree.SubElement(xml_group, 'separator', {
-                        'string': field_info[field.name]['string'],
-                        'colspan': '6',
-                    })
                     etree.SubElement(xml_group, 'field', {
                         'name': "selection__" + field.name,
-                        'colspan': '6',
-                        'nolabel': '1'
+                        'colspan': '4'
                     })
                     etree.SubElement(xml_group, 'field', {
                         'name': field.name,
