@@ -25,11 +25,11 @@ class MassEditingWizard(models.TransientModel):
         res = super().default_get(fields)
         server_action_id = self.env.context.get("server_action_id")
         server_action = self.env["ir.actions.server"].sudo().browse(server_action_id)
+        active_ids = self.env.context.get("active_ids")
 
         if not server_action:
             return res
 
-        active_ids = self.env.context.get("active_ids") or self.env["ir.actions.server"]
         original_active_ids = self.env.context.get("original_active_ids", active_ids)
         operation_description_info = False
         operation_description_warning = False
@@ -121,7 +121,7 @@ class MassEditingWizard(models.TransientModel):
         if field.ttype == "many2many":
             selection = [
                 ("ignore", _("Don't touch")),
-                ("set", _("Set")),
+                ("set_m2m", _("Set")),
                 ("remove_m2m", _("Remove")),
                 ("add", _("Add")),
             ]
@@ -181,9 +181,9 @@ class MassEditingWizard(models.TransientModel):
             dummy, tree_view = comodel._get_view(view_type="tree")
             field_context = {}
             if form_view:
-                field_context["form_view_ref"] = form_view.id
+                field_context["form_view_ref"] = form_view.xml_id
             if tree_view:
-                field_context["tree_view_ref"] = tree_view.id
+                field_context["tree_view_ref"] = tree_view.xml_id
             if field_context:
                 field_element.attrib["context"] = json.dumps(field_context)
             else:
@@ -204,9 +204,7 @@ class MassEditingWizard(models.TransientModel):
     def _get_field_options(self, field):
         return {
             "name": field.name,
-            "modifiers": '{"invisible": "\
-            "[["selection__%s", "in", ["ignore", "remove"]]]}'
-            % field.name,
+            "invisible": 'selection__%s in ["ignore", "remove", False]' % field.name,
             "class": "w-75",
         }
 
@@ -284,11 +282,9 @@ class MassEditingWizard(models.TransientModel):
                     if key.startswith("selection_"):
                         split_key = key.split("__", 1)[1]
                         if val == "set" or val == "add_o2m":
-                            if val == "set":
-                                vals[split_key] = vals[split_key][0][1:]
                             values.update({split_key: vals.get(split_key, False)})
 
-                        elif val == "set_o2m":
+                        elif val == "set_o2m" or val == "set_m2m":
                             values.update(
                                 {split_key: [(6, 0, [])] + vals.get(split_key, [])}
                             )
@@ -299,19 +295,15 @@ class MassEditingWizard(models.TransientModel):
                         elif val == "remove_m2m":
                             m2m_list = []
                             if vals.get(split_key):
-                                vals[split_key][0] = vals[split_key][0][1:]
-                                for m2m_id in vals.get(split_key, False)[0]:
-                                    m2m_list.append((3, m2m_id))
+                                for m2m_id in vals.get(split_key, False):
+                                    m2m_list.append((3, m2m_id[1]))
                             if m2m_list:
                                 values.update({split_key: m2m_list})
                             else:
                                 values.update({split_key: [(5, 0, [])]})
 
                         elif val == "add":
-                            m2m_list = []
-                            for m2m_id in vals.get(split_key, False):
-                                m2m_list.append(m2m_id)
-                            values.update({split_key: m2m_list})
+                            values.update({split_key: vals.get(split_key, False)})
 
                 if values:
                     self.env[server_action.model_id.model].browse(
